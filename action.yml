@@ -1,0 +1,64 @@
+name: "TMS Docker Build 2"
+description: "Build docker image and push to a container registry, then publish to Port"
+inputs:
+  tag:
+    description: "docker tag"
+    required: true
+
+  github-token:
+    description: "github token"
+    required: true
+  port-container-image-webhook:
+    description: "webhook to publish container image to Port"
+
+  container-registry:
+    description: "container registry"
+    required: true
+  container-registry-project:
+    description: "container registry project"
+    required: true
+  container-registry-username:
+    description: "container registry username"
+    required: true
+  container-registry-password:
+    description: "container registry password"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
+    - name: Set Docker tag
+      run: |
+        SHORT_SHA=${GITHUB_SHA::7}
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          TAG="${{ github.event.release.tag_name }}"
+        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          TAG="pr-${{ github.event.pull_request.number }}-${SHORT_SHA}"
+        else
+          TAG="main-${SHORT_SHA}"
+        fi
+        echo "DOCKER_TAG=$TAG" >> $GITHUB_ENV
+      shell: bash
+
+    - name: "Docker build"
+      run: docker build --build-arg GH_TOKEN=${{ inputs.github-token }} --build-arg VERSION=${{ env.DOCKER_TAG }} -t ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} .
+      shell: bash
+    - name: "Docker push"
+      run: |
+        docker login -u ${{ inputs.container-registry-username }} -p ${{ inputs.container-registry-password }} ${{ inputs.container-registry }}
+        docker tag ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:latest
+        docker tag ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:${{ env.DOCKER_TAG }}
+        docker push ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:latest
+        docker push ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:${{ env.DOCKER_TAG }}
+      shell: bash
+    - name: "Add container to Port"
+      if: ${{ inputs.port-container-image-webhook != '' }}
+      shell: bash
+      run: |
+        curl -X POST ${{ inputs.port-container-image-webhook }} -H "Content-Type: application/json" -d '{"image_name":"${{ github.event.repository.name }}","tag":"${{ env.DOCKER_TAG }}"}'
