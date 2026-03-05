@@ -48,10 +48,12 @@ runs:
     - name: "Docker push"
       run: |
         docker login -u ${{ inputs.container-registry-username }} -p ${{ inputs.container-registry-password }} ${{ inputs.container-registry }}
-        docker tag ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:latest
         docker tag ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:${{ env.DOCKER_TAG }}
-        docker push ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:latest
         docker push ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:${{ env.DOCKER_TAG }}
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          docker tag ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:latest
+          docker push ${{ inputs.container-registry }}/${{ inputs.container-registry-project }}/${{ github.event.repository.name }}:latest
+        fi
       shell: bash
     - name: "Add container to Port"
       if: ${{ inputs.port-container-image-webhook != '' }}
