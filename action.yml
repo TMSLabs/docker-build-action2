@@ -43,7 +43,7 @@ runs:
       shell: bash
 
     - name: "Docker build"
-      run: docker build --build-arg GH_TOKEN=${{ inputs.github-token }} --build-arg VERSION=${{ env.DOCKER_TAG }} -t ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} .
+      run: docker build --no-cache --build-arg GH_TOKEN=${{ inputs.github-token }} --build-arg VERSION=${{ env.DOCKER_TAG }} -t ${{ github.event.repository.name }}:${{ env.DOCKER_TAG }} .
       shell: bash
     - name: "Docker push"
       run: |
